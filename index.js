@@ -98,6 +98,6 @@ app.get('/user',
 
 /* REGISTER SOME USERS */
 
-UserDetails.register({username:'paul', active: false}, 'paul');
-UserDetails.register({username:'jay', active: false}, 'jay');
-UserDetails.register({username:'roy', active: false}, 'roy');
+UserDetails.register({username:'harold', active: false}, 'harold');
+UserDetails.register({username:'kionte', active: false}, 'kionte');
+UserDetails.register({username:'justin', active: false}, 'justin');
