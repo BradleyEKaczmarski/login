@@ -1,0 +1,301 @@
+Access Now
+
+Skip to main content
+Blog
+Community
+Jobs
+Library
+Login
+Join Premium
+Local Authentication Using Passport in Node.js
+By Beardscript
+JavaScript
+
+April 8, 2020
+Share:
+
+
+
+
+
+
+Free JavaScript Book!
+
+Write powerful, clean and maintainable JavaScript.
+
+RRP $11.95
+
+Get the book free!
+A common requirement when building a web app is to implement a login system, so that users can authenticate themselves before gaining access to protected views or resources. Luckily for those building Node apps, there’s a middleware called Passport that can be dropped into any Express-based web application to provide authentication mechanisms in only a few commands.
+
+In this tutorial, I’ll demonstrate how to use Passport to implement local authentication (that is, logging in with a username and password) with a MongoDB back end. If you’re looking to implement authentication via the likes of Facebook or GitHub, please refer to this tutorial.
+
+As ever, all of the code for this article is available for download on GitHub.
+
+Prerequisites
+To follow along with this tutorial, you’ll need to have Node and MongoDB installed on your machine.
+
+You can install Node by heading to the official Node download page and grabbing the correct binaries for your system. Alternatively, you can use a version manager — a program that allows you to install multiple versions of Node and switch between them at will. If you fancy going this route, please consult our quick tip, “Install Multiple Versions of Node.js Using nvm”.
+
+MongoDB comes in various editions. The one we’re interested in is the MongoDB Community Edition.
+
+The project’s home page has excellent documentation and I won’t try to replicate that here. Rather, I’ll offer you links to instructions for each of the main operating systems:
+
+Install MongoDB Community Edition on Windows
+Install MongoDB Community Edition on macOS
+Install MongoDB Community Edition on Ubuntu
+If you use a non-Ubuntu–based version of Linux, you can check out this page for installation instructions for other distros. MongoDB is also normally available through the official Linux software channels, but sometimes this will pull in an outdated version.
+
+Note: You don’t need to enter your name and address to download MongoDB. If prompted, you can normally dismiss the dialog.
+
+If you’d like a quick refresher on using MongoDB, check out our beginner’s guide, “An Introduction to MongoDB”.
+
+Authentication Strategies: Session vs JWT
+Before we begin, let’s talk briefly about authentication choices.
+
+Many of the tutorials online today will opt for token-based authentication using JSON Web Tokens (JWTs). This approach is probably the simplest and most popular one nowadays. It relegates part of the authentication responsibility to the client and makes them sign a token that’s sent with every request, to keep the user authenticated.
+
+Session-based authentication has been around longer. This method relegates the weight of the authentication to the server. It uses cookies and sees the Node application and database work together to keep track of a user’s authentication state.
+
+In this tutorial, we’ll be using session-based authentication, which is at the heart of the passport-local strategy.
+
+
+Both methods have their advantages and drawbacks. If you’d like to read more into the difference between the two, this Stack Overflow thread might be a good place to start.
+
+Creating the Project
+Once all of the prerequisite software is set up, we can get started.
+
+We’ll begin by creating the folder for our app and then accessing that folder on the terminal:
+
+mkdir AuthApp
+cd AuthApp
+To create the node app, we’ll use the following command:
+
+
+Learn PHP for free!
+Make the leap into server-side programming with a comprehensive cover of PHP & MySQL.
+
+Normally RRP $11.95 Yours absolutely free
+
+Name
+Email
+Get the book free
+npm init
+You’ll be prompted to provide some information for Node’s package.json. Just keep hitting Return to accept the default configuration (or use the -y flag).
+
+Setting up Express
+Now we need to install Express. Go to the terminal and enter this command:
+
+npm install express
+We’ll also need to install the body-parser middleware which is used to parse the request body that Passport uses to authenticate the user. And we’ll need to install the express-session middleware.
+
+Let’s do that. Run the following command:
+
+npm install body-parser express-session
+When that’s done, create an index.js file in the root folder of your app and add the following content to it:
+
+/*  EXPRESS SETUP  */
+
+const express = require('express');
+const app = express();
+
+app.use(express.static(__dirname));
+
+const bodyParser = require('body-parser');
+const expressSession = require('express-session')({
+  secret: 'secret',
+  resave: false,
+  saveUninitialized: false
+});
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(expressSession);
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log('App listening on port ' + port));
+First, we require Express and create our Express app by calling express(). Then we define the directory from which to serve our static files.
+
+The next line sees us require the body-parser middleware, which will help us parse the body of our requests. We’re also adding the express-session middleware to help us save the session cookie.
+
+As you can, see we’re configuring express-session with a secret to sign the session ID cookie (you should choose a unique value here), and two other fields, resave and saveUninitialized. The resave field forces the session to be saved back to the session store, and the saveUninitialized field forces a session that is “uninitialized” to be saved to the store. To learn more about them, check out their documentation, but for now it’s enough to know that for our case we want to keep them false.
+
+Then, we use process.env.PORT to set the port to the environment port variable if it exists. Otherwise, we’ll default to 3000, which is the port we’ll be using locally. This gives you enough flexibility to switch from development, directly to a production environment where the port might be set by a service provider like, for instance, Heroku. Right below that, we called app.listen() with the port variable we set up and a simple log to let us know that it’s all working fine and on which port is the app listening.
+
+
+That’s all for the Express setup. Now it’s on to setting up Passport.
+
+Setting up Passport
+First, we install Passport with the following command:
+
+npm install passport
+Then we need to add the following lines to the bottom of the index.js file:
+
+/*  PASSPORT SETUP  */
+
+const passport = require('passport');
+
+app.use(passport.initialize());
+app.use(passport.session());
+Here, we require passport and initialize it along with its session authentication middleware, directly inside our Express app.
+
+Creating a MongoDB Data Store
+Since we’re assuming you’ve already installed Mongo, you should be able to start the Mongo shell using the following command:
+
+mongo
+Within the shell, issue the following command:
+
+use MyDatabase;
+This simply creates a datastore named MyDatabase.
+
+Leave the terminal there; we’ll come back to it later.
+
+Connecting Mongo to Node with Mongoose
+Now that we have a database with records in it, we need a way to communicate with it from our application. We’ll be using Mongoose to achieve this. Why don’t we just use plain Mongo? Well, as the Mongoose devs like to say ,A href=”https://mongoosejs.com/docs/unstable/index.html”>on their website:
+
+writing MongoDB validation, casting and business logic boilerplate is a drag.
+
+Mongoose will simply make our lives easier and our code more elegant.
+
+Let’s go ahead and install it with the following command:
+
+npm install mongoose
+We’ll also be using passport-local-mongoose, which will simplify the integration between Mongoose and Passport for local authentication. It will add a hash and salt field to our Schema in order to store the hashed password and the salt value. This is great, as passwords should never be stored as plain text in a database.
+
+
+Let’s install the package:
+
+npm install passport-local-mongoose
+Now we have to configure Mongoose. Hopefully you know the drill by now: add the following code to the bottom of your index.js file:
+
+/* MONGOOSE SETUP */
+
+const mongoose = require('mongoose');
+const passportLocalMongoose = require('passport-local-mongoose');
+
+mongoose.connect('mongodb://localhost/MyDatabase',
+  { useNewUrlParser: true, useUnifiedTopology: true });
+
+const Schema = mongoose.Schema;
+const UserDetail = new Schema({
+  username: String,
+  password: String
+});
+
+UserDetail.plugin(passportLocalMongoose);
+const UserDetails = mongoose.model('userInfo', UserDetail, 'userInfo');
+Here we require the previously installed packages. Then we connect to our database using mongoose.connect and give it the path to our database. Next, we’re making use of a Schema to define our data structure. In this case, we’re creating a UserDetail schema with username and password fields.
+
+Finally, we add passportLocalMongoose as a plugin to our Schema. This will work part of the magic we talked about earlier. Then, we create a model from that schema. The first parameter is the name of the collection in the database. The second one is the reference to our Schema, and the third one is the name we’re assigning to the collection inside Mongoose.
+
+That’s all for the Mongoose setup. We can now move on to implementing our Passport strategy.
+
+Implementing Local Authentication
+And finally, this is what we came here to do! Let’s set up the local authentication. As you’ll see below, we’ll just write the code that will set it up for us:
+
+/* PASSPORT LOCAL AUTHENTICATION */
+
+passport.use(UserDetails.createStrategy());
+
+passport.serializeUser(UserDetails.serializeUser());
+passport.deserializeUser(UserDetails.deserializeUser());
+There’s quite some magic going on here. First, we make passport use the local strategy by calling createStrategy() on our UserDetails model — courtesy of passport-local-mongoose — which takes care of everything so that we don’t have to set up the strategy. Pretty handy.
+
+Then we’re using serializeUser and deserializeUser callbacks. The first one will be invoked on authentication, and its job is to serialize the user instance with the information we pass on to it and store it in the session via a cookie. The second one will be invoked every subsequent request to deserialize the instance, providing it the unique cookie identifier as a “credential”. You can read more about that in the Passport documentation.
+
+Routes
+Now let’s add some routes to tie everything together. First, we’ll add a final package. Go to the terminal and run the following command:
+
+npm install connect-ensure-login
+The connect-ensure-login package is middleware that ensures a user is logged in. If a request is received that is unauthenticated, the request will be redirected to a login page. We’ll use this to guard our routes.
+
+Now, add the following to the bottom of index.js:
+
+/* ROUTES */
+
+const connectEnsureLogin = require('connect-ensure-login');
+
+app.post('/login', (req, res, next) => {
+  passport.authenticate('local',
+  (err, user, info) => {
+    if (err) {
+      return next(err);
+    }
+
+    if (!user) {
+      return res.redirect('/login?info=' + info);
+    }
+
+    req.logIn(user, function(err) {
+      if (err) {
+        return next(err);
+      }
+
+      return res.redirect('/');
+    });
+
+  })(req, res, next);
+});
+
+app.get('/login',
+  (req, res) => res.sendFile('html/login.html',
+  { root: __dirname })
+);
+
+app.get('/',
+  connectEnsureLogin.ensureLoggedIn(),
+  (req, res) => res.sendFile('html/index.html', {root: __dirname})
+);
+
+app.get('/private',
+  connectEnsureLogin.ensureLoggedIn(),
+  (req, res) => res.sendFile('html/private.html', {root: __dirname})
+);
+
+app.get('/user',
+  connectEnsureLogin.ensureLoggedIn(),
+  (req, res) => res.send({user: req.user})
+);
+At the top, we’re requiring connect-ensure-login. We’ll come back to this later.
+
+Next, we set up a route to handle a POST request to the /login path. Inside the handler, we use the passport.authenticate method, which attempts to authenticate with the strategy it receives as its first parameter — in this case local. If authentication fails, it will redirect us to /login, but it will add a query parameter — info — that will contain an error message. Otherwise, if authentication is successful, it will redirect us to the '/' route.
+
+
+Then we set up the /login route, which will send the login page. For this, we’re using res.sendFile() and passing in the file path and our root directory, which is the one we’re working on — hence the __dirname.
+
+The /login route will be accessible to anyone, but our next ones won’t. In the / and /private routes we’ll send their respective HTML pages, and you’ll notice something different here. Before the callback, we’re adding the connectEnsureLogin.ensureLoggedIn() call. This is our route guard. Its job is validating the session to make sure you’re allowed to look at that route. Do you see now what I meant earlier by “letting the server do the heavy lifting”? We’re authenticating the user every single time.
+
+Finally, we’ll need a /user route, which will return an object with our user information. This is just to show you how you can go about getting information from the server. We’ll request this route from the client and display the result.
+
+Talking about the client, let’s do that now.
+
+The Client
+The client should be quite simple. We’ll create some HTML pages and a CSS file. Let’s begin with the home page, or index. In your project root, create a folder called html and add a file called index.html. Add the following to it:
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title> Home </title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+  <div class="message-box">
+    <h1 id="welcome-message"></h1>
+    <a href="/private">Go to private area</a>
+  </div>
+
+  <script>
+    const req = new XMLHttpRequest();
+    req.onreadystatechange = function () {
+      if (req.readyState == 4 && req.status == 200) {
+        const user = JSON.parse(req.response).user;
+        document.getElementById("welcome-message").innerText = `Welcome ${user.username}!!`;
+      }
+    };
+    req.open("GET", "http://localhost:3000/user", true);
+    req.send();
+  </script>
+</body>
+</html>
