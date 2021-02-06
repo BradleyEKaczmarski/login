@@ -1,4 +1,4 @@
-/*  EXPRESS SETUP  */
+/*  express setup  */
 
 const express = require('express');
 const app = express();
@@ -19,14 +19,14 @@ app.use(expressSession);
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log('App listening on port ' + port));
 
-/*  PASSPORT SETUP  */
+/*  passport setup  */
 
 const passport = require('passport');
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-/* MONGOOSE SETUP */
+/* mongoose setup */
 
 const mongoose = require('mongoose');
 const passportLocalMongoose = require('passport-local-mongoose');
@@ -43,7 +43,7 @@ const UserDetail = new Schema({
 UserDetail.plugin(passportLocalMongoose);
 const UserDetails = mongoose.model('userInfo', UserDetail, 'userInfo');
 
-/* PASSPORT LOCAL AUTHENTICATION */
+/* passport local authentification */
 
 passport.use(UserDetails.createStrategy());
 
@@ -96,8 +96,8 @@ app.get('/user',
   (req, res) => res.send({user: req.user})
 );
 
-/* REGISTER SOME USERS */
+/* schema */
 
-UserDetails.register({username:'harold', active: false}, 'harold');
-UserDetails.register({username:'kionte', active: false}, 'kionte');
-UserDetails.register({username:'justin', active: false}, 'justin');
+// UserDetails.register({username:'harold', active: false}, 'harold');
+// UserDetails.register({username:'kionte', active: false}, 'kionte');
+// UserDetails.register({username:'justin', active: false}, 'justin');
